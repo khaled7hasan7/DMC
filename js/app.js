@@ -346,6 +346,7 @@
     ctx.fillText('عدد الألوان: ' + state.items.length + '   •   مجموع الكبب: ' + balls, W / 2, fy + 45);
     ctx.font = font(600, 24);
     ctx.fillText('ما يعادل ' + cartons + ' كرتونة' + (rest ? ' و ' + rest + ' كبة' : '') + ' (الكرتونة = ' + perCarton() + ' كبب)', W / 2, fy + 82);
+    $('orderImage').src = canvas.toDataURL('image/png');
   }
 
   function roundRect(ctx, x, y, w, h, r) {
@@ -424,8 +425,18 @@
     commit();
   });
 
+  var clearArmed = null;
   $('clearBtn').addEventListener('click', function () {
-    if (!confirm('هل تريد مسح الطلبية كلها؟')) return;
+    var btn = $('clearBtn');
+    // تأكيد داخل الصفحة: الضغطة الأولى تطلب التأكيد والثانية تمسح.
+    if (!clearArmed) {
+      btn.textContent = 'اضغط مرة أخرى للتأكيد';
+      clearArmed = setTimeout(function () { clearArmed = null; btn.textContent = 'مسح الطلبية'; }, 4000);
+      return;
+    }
+    clearTimeout(clearArmed);
+    clearArmed = null;
+    btn.textContent = 'مسح الطلبية';
     state.items = [];
     $('imageCard').hidden = true;
     commit();
