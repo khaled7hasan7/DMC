@@ -245,3 +245,11 @@ body.sheet-open main { padding-bottom: 120px; }
   .tile-grid { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 8px; }
   .swatch.big { width: 48px; height: 48px; }
 }
+
+.btn.wa {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  background: #1f8f4e; border-color: #1f8f4e; color: #ffffff;
+  text-decoration: none;
+}
+.share-note a { color: var(--accent); font-weight: 700; }
+#imageCard .actions .btn { flex: 1 1 160px; text-align: center; }

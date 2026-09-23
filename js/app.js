@@ -351,6 +351,7 @@
     ctx.font = font(600, 24);
     ctx.fillText('ما يعادل ' + cartons + ' كرتونة' + (rest ? ' و ' + rest + ' كبة' : '') + ' (الكرتونة = ' + perCarton() + ' كبب)', W / 2, fy + 82);
     $('orderImage').src = canvas.toDataURL('image/png');
+    prepareImageFile();
   }
 
   function roundRect(ctx, x, y, w, h, r) {
@@ -605,28 +606,74 @@
     });
   });
 
-  $('downloadBtn').addEventListener('click', function () {
-    canvasBlob().then(function (blob) {
-      var a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = fileName();
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-    });
-  });
+  // ---------- التحميل والمشاركة ----------
 
-  if (navigator.canShare) {
-    $('shareBtn').hidden = false;
-    $('shareBtn').addEventListener('click', function () {
-      canvasBlob().then(function (blob) {
-        var file = new File([blob], fileName(), { type: 'image/png' });
-        if (navigator.canShare({ files: [file] })) {
-          navigator.share({ files: [file], title: 'طلبية خيوط DMC Art. 116' }).catch(function () {});
+  var imageFile = null; // ملف الصورة جاهز مسبقاً حتى تعمل المشاركة مباشرة عند الضغط
+
+  function prepareImageFile() {
+    imageFile = null;
+    canvasBlob().then(function (blob) {
+      imageFile = new File([blob], fileName(), { type: 'image/png' });
+    });
+    $('waBtn').href = 'https://wa.me/?text=' + encodeURIComponent(orderText());
+  }
+
+  function orderText() {
+    var balls = totalBalls(), cartons = Math.floor(balls / perCarton()), rest = balls % perCarton();
+    var lines = ['طلبية خيوط DMC Art. 116 مقاس 8', ''];
+    state.items.forEach(function (it) { lines.push('• ' + it.code + ' — ' + formatQty(it)); });
+    lines.push('', 'عدد الألوان: ' + state.items.length);
+    lines.push('مجموع الكبب: ' + balls + ' (' + cartons + ' كرتونة' + (rest ? ' و ' + rest + ' كبة' : '') + ')');
+    return lines.join('\n');
+  }
+
+  function shareNote(text, withLink) {
+    var note = $('shareNote');
+    note.innerHTML = '';
+    note.appendChild(document.createTextNode(text));
+    if (withLink) {
+      note.appendChild(document.createTextNode(' '));
+      note.appendChild(el('a', { href: $('waBtn').href, target: '_blank', rel: 'noopener', text: 'افتح واتساب مع نص الطلبية' }));
+    }
+    note.hidden = false;
+  }
+
+  // داخل صفحة Claude يمر التحميل عبر نافذة تأكيد، وخارجها رابط تحميل عادي.
+  function saveImage() {
+    return canvasBlob().then(function (blob) {
+      var use = window.claude && window.claude.use ? window.claude.use('downloads') : Promise.resolve(null);
+      return use.then(function (downloads) {
+        if (downloads) {
+          return downloads.save({ filename: fileName(), data: blob }).then(
+            function () { shareNote('تم حفظ الصورة.'); },
+            function (err) {
+              if (err && err.code === 'declined') return;
+              shareNote('تعذّر حفظ الصورة هنا. اضغط مطولاً على الصورة لحفظها.');
+            });
         }
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = fileName();
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
       });
     });
   }
+
+  $('downloadBtn').addEventListener('click', saveImage);
+
+  // زر واتساب: على الجوال تفتح قائمة المشاركة ومعها الصورة (اختر واتساب منها).
+  // إذا لم يدعم المتصفح مشاركة الصور يفتح واتساب مباشرة مع نص الطلبية.
+  $('waBtn').addEventListener('click', function (e) {
+    var data = imageFile && { files: [imageFile], text: orderText() };
+    if (!data || !navigator.canShare || !navigator.canShare({ files: [imageFile] })) return;
+    e.preventDefault();
+    navigator.share(data).catch(function (err) {
+      if (err && err.name === 'AbortError') return;
+      shareNote('المتصفح هنا لا يسمح بإرسال الصورة مباشرة. حمّل الصورة أولاً ثم أرفقها في المحادثة، أو', true);
+    });
+  });
 
   render();
   if (location.hash === '#colors') showView('colors');
