@@ -12,13 +12,20 @@
 <body>
   <header class="top">
     <div class="wrap">
-      <h1>طلبية خيوط <span class="ltr">DMC Art. 116</span></h1>
+      <h1>طلبية خيوط <span class="ltr">DMC Art. 116</span> <span class="size-tag">مقاس 8</span></h1>
       <p class="sub">أدخل أرقام الألوان والكميات. يرفض الموقع أي رقم غير موجود عند DMC، ثم يصنع لك صورة جاهزة للطلبية.</p>
     </div>
   </header>
 
+  <nav class="wrap tabs" role="tablist">
+    <button id="tabOrder" type="button" role="tab" class="tab active" aria-selected="true">الطلبية</button>
+    <button id="tabColors" type="button" role="tab" class="tab" aria-selected="false">تصفح الألوان</button>
+  </nav>
+
   <main class="wrap">
     <p id="listNotice" class="notice" hidden></p>
+
+    <div id="orderView">
 
     <section class="card">
       <h2>إضافة لون</h2>
@@ -84,7 +91,43 @@ BLANC 3 كبة</pre>
       </div>
       <p class="hint">على الجوال يمكنك أيضاً الضغط مطولاً على الصورة لحفظها. الألوان على الشاشة تقريبية، والمرجع الدقيق هو رقم اللون.</p>
     </section>
+    </div>
+
+    <div id="colorsView" hidden>
+      <section class="card">
+        <div class="browse-tools">
+          <label class="field search-field">
+            <span>ابحث برقم اللون</span>
+            <input id="colorSearch" type="search" placeholder="مثال: 3865" dir="ltr" autocomplete="off">
+          </label>
+          <label class="field">
+            <span>الترتيب</span>
+            <select id="colorSort">
+              <option value="family">حسب مجموعة اللون</option>
+              <option value="number">حسب الرقم</option>
+            </select>
+          </label>
+        </div>
+        <div id="familyChips" class="family-chips"></div>
+        <p id="colorCount" class="hint"></p>
+      </section>
+      <div id="colorGroups"></div>
+    </div>
   </main>
+
+  <div id="pickSheet" class="pick-sheet" hidden>
+    <div class="wrap pick-inner">
+      <span id="pickSwatch" class="swatch big"></span>
+      <b id="pickCode" class="pick-code"></b>
+      <input id="pickQty" type="number" min="1" step="1" value="1" inputmode="numeric" dir="ltr" aria-label="الكمية">
+      <select id="pickUnit" aria-label="الوحدة">
+        <option value="ball">كبة</option>
+        <option value="carton">كرتونة</option>
+      </select>
+      <button id="pickAdd" type="button" class="btn primary">إضافة للطلبية</button>
+      <button id="pickClose" type="button" class="del" aria-label="إغلاق">×</button>
+    </div>
+  </div>
 
   <script src="js/dmc-colors.js"></script>
   <script src="js/art116.js"></script>

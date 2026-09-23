@@ -19,7 +19,7 @@
 
   if (!(window.ART116_CODES && window.ART116_CODES.length)) {
     $('listNotice').hidden = false;
-    $('listNotice').textContent = 'تنبيه: قائمة ألوان Art. 116 الخاصة لم تُضَف بعد، لذلك يتحقق الموقع حالياً من أرقام DMC الأساسية كلها (' + allowed.length + ' لوناً).';
+    $('listNotice').textContent = 'تنبيه: قائمة ألوان Art. 116 مقاس 8 الخاصة لم تُضَف بعد، لذلك يتحقق الموقع حالياً من أرقام DMC الأساسية كلها (' + allowed.length + ' لوناً).';
   }
 
   // ---------- أدوات ----------
@@ -87,7 +87,9 @@
     return e;
   }
 
-  function swatch(code) { return el('span', { class: 'swatch', style: 'background:' + colorOf(code) }); }
+  function swatch(code, extra) {
+    return el('span', { class: 'swatch thread' + (extra ? ' ' + extra : ''), style: 'background-color:' + colorOf(code) });
+  }
 
   // ---------- التخزين ----------
 
@@ -144,8 +146,9 @@
     }
     if (allowedSet.has(code)) {
       wrap.classList.add('valid');
-      codeSwatch.className = 'swatch';
-      codeSwatch.style.background = colorOf(code);
+      codeSwatch.className = 'swatch thread';
+      codeSwatch.style.background = '';
+      codeSwatch.style.backgroundColor = colorOf(code);
       var existing = state.items.find(function (it) { return it.code === code; });
       codeStatus.appendChild(el('div', { class: 'msg ok' }, [
         document.createTextNode('✓ الرقم '),
@@ -237,6 +240,7 @@
   function commit() {
     save();
     render();
+    renderColors();
     if (!$('imageCard').hidden) drawImage();
   }
 
@@ -307,7 +311,7 @@
     ctx.textAlign = 'center';
     ctx.direction = 'rtl';
     ctx.font = font(800, 50);
-    ctx.fillText('طلبية خيوط DMC Art. 116', W / 2, 78);
+    ctx.fillText('طلبية خيوط DMC Art. 116 مقاس 8', W / 2, 78);
     ctx.font = font(600, 26);
     var date = new Date().toLocaleDateString('ar-EG-u-nu-latn', { year: 'numeric', month: 'long', day: 'numeric' });
     ctx.fillText(date, W / 2, 122);
@@ -367,17 +371,18 @@
     ctx.fillStyle = color;
     ctx.fill();
     ctx.clip();
-    ctx.strokeStyle = isDark(color) ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.12)';
+    ctx.strokeStyle = isDark(color) ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)';
     ctx.lineWidth = 2;
     for (var k = -r; k <= r; k += 9) {
       ctx.beginPath();
       ctx.ellipse(cx, cy + k * 0.3, r * 1.1, Math.abs(k) * 0.5 + 6, -0.5, 0, Math.PI * 2);
       ctx.stroke();
     }
-    var g = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.1, cx, cy, r);
-    g.addColorStop(0, 'rgba(255,255,255,0.45)');
-    g.addColorStop(0.5, 'rgba(255,255,255,0)');
-    g.addColorStop(1, 'rgba(0,0,0,0.28)');
+    var g = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.05, cx, cy, r);
+    g.addColorStop(0, 'rgba(255,255,255,0.3)');
+    g.addColorStop(0.3, 'rgba(255,255,255,0)');
+    g.addColorStop(0.7, 'rgba(0,0,0,0)');
+    g.addColorStop(1, 'rgba(0,0,0,0.2)');
     ctx.fillStyle = g;
     ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
     ctx.restore();
@@ -398,6 +403,152 @@
   }
 
   function fileName() { return 'DMC-116-' + new Date().toISOString().slice(0, 10) + '.png'; }
+
+  // ---------- تصفح الألوان ----------
+
+  var FAMILIES = [
+    { id: 'white', name: 'أبيض وكريمي', dot: '#F7F3EA' },
+    { id: 'gray', name: 'رمادي وأسود', dot: '#6C6C6C' },
+    { id: 'red', name: 'أحمر', dot: '#C72B3B' },
+    { id: 'pink', name: 'وردي', dot: '#F08BA6' },
+    { id: 'orange', name: 'برتقالي', dot: '#F27A2B' },
+    { id: 'yellow', name: 'أصفر', dot: '#F5C83B' },
+    { id: 'green', name: 'أخضر', dot: '#3F8F47' },
+    { id: 'blue', name: 'أزرق وتركوازي', dot: '#3A6FB0' },
+    { id: 'purple', name: 'بنفسجي', dot: '#7B4B94' },
+    { id: 'brown', name: 'بني وبيج', dot: '#8A5A36' }
+  ];
+
+  function hsl(hex) {
+    var n = parseInt(hex.slice(1), 16);
+    var r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+    var max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, h = 0, sat = 0;
+    if (max !== min) {
+      var d = max - min;
+      sat = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      h *= 60;
+    }
+    return { h: h, s: sat, l: l };
+  }
+
+  function familyOf(code) {
+    var c = hsl(colorOf(code));
+    if (c.l > 0.9) return 'white';
+    if (c.s < 0.1 || c.l < 0.08) return 'gray';
+    if (c.h >= 15 && c.h < 70 && (c.l < 0.4 || c.s < 0.4)) return 'brown';
+    if (c.h < 12 || c.h >= 345) return c.l > 0.7 ? 'pink' : 'red';
+    if (c.h < 42) return c.l > 0.8 ? 'pink' : 'orange';
+    if (c.h < 70) return 'yellow';
+    if (c.h < 165) return 'green';
+    if (c.h < 250) return 'blue';
+    if (c.h < 318) return 'purple';
+    return 'pink';
+  }
+
+  var browse = { family: 'all', selected: null };
+  var colorsView = $('colorsView');
+
+  function codeSortKey(c) { return /^\d+$/.test(c) ? parseInt(c, 10) : -1; }
+
+  function renderColors() {
+    if (colorsView.hidden) return;
+    var q = normalizeCode($('colorSearch').value);
+    var byNumber = $('colorSort').value === 'number';
+    var inOrder = {};
+    state.items.forEach(function (it) { inOrder[it.code] = it; });
+
+    var codes = allowed.filter(function (c) {
+      return (!q || c.indexOf(q) === 0) && (browse.family === 'all' || familyOf(c) === browse.family);
+    });
+    $('colorCount').textContent = codes.length + ' لوناً';
+
+    var chips = $('familyChips');
+    chips.innerHTML = '';
+    [{ id: 'all', name: 'الكل' }].concat(FAMILIES).forEach(function (f) {
+      var chip = el('button', { type: 'button', class: 'chip' + (browse.family === f.id ? ' active' : '') },
+        [f.dot ? el('span', { class: 'dot', style: 'background:' + f.dot }) : null, document.createTextNode(f.name)]);
+      chip.addEventListener('click', function () { browse.family = f.id; renderColors(); });
+      chips.appendChild(chip);
+    });
+
+    var groups = byNumber
+      ? [{ name: '', codes: codes.slice().sort(function (a, b) { return codeSortKey(a) - codeSortKey(b) || a.localeCompare(b); }) }]
+      : FAMILIES.map(function (f) {
+          return {
+            name: f.name,
+            codes: codes.filter(function (c) { return familyOf(c) === f.id; })
+              .sort(function (a, b) { return hsl(colorOf(b)).l - hsl(colorOf(a)).l; })
+          };
+        }).filter(function (g) { return g.codes.length; });
+
+    var box = $('colorGroups');
+    box.innerHTML = '';
+    if (!codes.length) {
+      box.appendChild(el('p', { class: 'empty-state', text: 'لا يوجد لون بهذا الرقم.' }));
+      return;
+    }
+    groups.forEach(function (g) {
+      var grid = el('div', { class: 'tile-grid' });
+      g.codes.forEach(function (c) {
+        var tile = el('button', { type: 'button', class: 'tile' + (browse.selected === c ? ' selected' : '') }, [
+          swatch(c, 'big'),
+          el('span', { class: 'num', text: c }),
+          inOrder[c] ? el('span', { class: 'in-order', text: formatQty(inOrder[c]) }) : null
+        ]);
+        tile.setAttribute('aria-label', 'لون ' + c);
+        tile.addEventListener('click', function () { openPick(c); });
+        grid.appendChild(tile);
+      });
+      box.appendChild(el('section', { class: 'group' }, [
+        g.name ? el('h3', {}, [document.createTextNode(g.name + ' '), el('small', { text: '(' + g.codes.length + ')' })]) : null,
+        grid
+      ]));
+    });
+  }
+
+  function openPick(code) {
+    browse.selected = code;
+    $('pickSwatch').className = 'swatch thread big';
+    $('pickSwatch').style.backgroundColor = colorOf(code);
+    $('pickCode').textContent = code;
+    $('pickQty').value = 1;
+    $('pickUnit').value = 'ball';
+    $('pickSheet').hidden = false;
+    document.body.classList.add('sheet-open');
+    renderColors();
+  }
+
+  function closePick() {
+    browse.selected = null;
+    $('pickSheet').hidden = true;
+    document.body.classList.remove('sheet-open');
+    renderColors();
+  }
+
+  function showView(which) {
+    var colors = which === 'colors';
+    $('orderView').hidden = colors;
+    colorsView.hidden = !colors;
+    $('tabOrder').classList.toggle('active', !colors);
+    $('tabColors').classList.toggle('active', colors);
+    $('tabOrder').setAttribute('aria-selected', String(!colors));
+    $('tabColors').setAttribute('aria-selected', String(colors));
+    if (colors) renderColors(); else closePick();
+  }
+
+  $('tabOrder').addEventListener('click', function () { showView('order'); });
+  $('tabColors').addEventListener('click', function () { showView('colors'); });
+  $('colorSearch').addEventListener('input', renderColors);
+  $('colorSort').addEventListener('change', renderColors);
+  $('pickClose').addEventListener('click', closePick);
+  $('pickAdd').addEventListener('click', function () {
+    var qty = parseInt($('pickQty').value, 10);
+    if (!browse.selected || !(qty > 0)) return;
+    addItem(browse.selected, qty, $('pickUnit').value);
+    closePick();
+    commit();
+  });
 
   // ---------- الأحداث ----------
 
@@ -478,4 +629,5 @@
   }
 
   render();
+  if (location.hash === '#colors') showView('colors');
 })();
