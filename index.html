@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>خيوط DMC Art. 116</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <h1>طلبية خيوط <span class="ltr">DMC Art. 116</span></h1>
+      <p class="sub">أدخل أرقام الألوان والكميات. يرفض الموقع أي رقم غير موجود عند DMC، ثم يصنع لك صورة جاهزة للطلبية.</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <p id="listNotice" class="notice" hidden></p>
+
+    <section class="card">
+      <h2>إضافة لون</h2>
+      <form id="addForm" class="add-row" autocomplete="off" novalidate>
+        <label class="field code-field">
+          <span>رقم اللون</span>
+          <div class="code-input">
+            <span id="codeSwatch" class="swatch empty" aria-hidden="true"></span>
+            <input id="codeInput" type="text" inputmode="text" placeholder="مثال: 321" dir="ltr">
+          </div>
+        </label>
+        <label class="field qty-field">
+          <span>الكمية</span>
+          <input id="qtyInput" type="number" min="1" step="1" value="1" inputmode="numeric" dir="ltr">
+        </label>
+        <label class="field unit-field">
+          <span>الوحدة</span>
+          <select id="unitInput">
+            <option value="ball">كبة</option>
+            <option value="carton">كرتونة</option>
+          </select>
+        </label>
+        <button id="addBtn" type="submit" class="btn primary" disabled>إضافة</button>
+      </form>
+      <div id="codeStatus" class="status" aria-live="polite"></div>
+
+      <details class="bulk">
+        <summary>لصق قائمة كاملة دفعة واحدة</summary>
+        <p class="hint">كل لون في سطر: الرقم ثم الكمية ثم الوحدة (اختيارية، والافتراضي كبة). مثال:</p>
+        <pre class="example" dir="rtl">310 5
+321 2 كرتونة
+BLANC 3 كبة</pre>
+        <textarea id="bulkInput" rows="6" dir="rtl" placeholder="310 5&#10;321 2 كرتونة"></textarea>
+        <button id="bulkBtn" type="button" class="btn">تحقق وأضف</button>
+        <div id="bulkStatus" class="status" aria-live="polite"></div>
+      </details>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>الطلبية</h2>
+        <label class="per-carton">
+          عدد الكبب في الكرتونة
+          <input id="perCartonInput" type="number" min="1" step="1" dir="ltr">
+        </label>
+      </div>
+      <div id="orderEmpty" class="empty-state">لم تتم إضافة أي لون بعد.</div>
+      <ul id="orderList" class="order-list"></ul>
+      <div id="totals" class="totals" hidden></div>
+      <div class="actions">
+        <button id="imageBtn" type="button" class="btn primary" disabled>إنشاء صورة الطلبية</button>
+        <button id="clearBtn" type="button" class="btn ghost" disabled>مسح الطلبية</button>
+      </div>
+    </section>
+
+    <section id="imageCard" class="card" hidden>
+      <h2>صورة الطلبية</h2>
+      <canvas id="orderCanvas" class="preview"></canvas>
+      <div class="actions">
+        <button id="downloadBtn" type="button" class="btn primary">تحميل الصورة</button>
+        <button id="shareBtn" type="button" class="btn" hidden>مشاركة</button>
+      </div>
+      <p class="hint">الألوان على الشاشة تقريبية، والمرجع الدقيق هو رقم اللون.</p>
+    </section>
+  </main>
+
+  <script src="js/dmc-colors.js"></script>
+  <script src="js/art116.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
