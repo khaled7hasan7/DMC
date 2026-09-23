@@ -3,9 +3,11 @@
 
   var STORAGE_KEY = 'dmc116-order';
   var ALIASES = { WHITE: 'BLANC', 'ابيض': 'BLANC', 'أبيض': 'BLANC', 'بلانك': 'BLANC', 'ايكرو': 'ECRU', 'إكرو': 'ECRU' };
+  var LETTER_CODES = ['BLANC', 'ECRU', 'B5200'];
 
   // الأرقام المقبولة: قائمة Art. 116 إن وُجدت، وإلا أرقام DMC الأساسية.
-  var allowed = window.ART116_CODES && window.ART116_CODES.length
+  var hasArt116List = !!(window.ART116_CODES && window.ART116_CODES.length);
+  var allowed = hasArt116List
     ? window.ART116_CODES.map(function (c) { return normalizeCode(c); })
     : Object.keys(window.DMC_COLORS);
   var allowedSet = new Set(allowed);
@@ -13,13 +15,12 @@
   var state = load();
 
   var $ = function (id) { return document.getElementById(id); };
-  var codeInput = $('codeInput'), qtyInput = $('qtyInput'), unitInput = $('unitInput');
+  var codeInput = $('codeInput'), qtyInput = $('qtyInput');
   var addBtn = $('addBtn'), codeStatus = $('codeStatus'), codeSwatch = $('codeSwatch');
-  var perCartonInput = $('perCartonInput');
 
-  if (!(window.ART116_CODES && window.ART116_CODES.length)) {
+  if (!hasArt116List) {
     $('listNotice').hidden = false;
-    $('listNotice').textContent = 'تنبيه: قائمة ألوان Art. 116 مقاس 8 الخاصة لم تُضَف بعد، لذلك يتحقق الموقع حالياً من أرقام DMC الأساسية كلها (' + allowed.length + ' لوناً).';
+    $('listNotice').textContent = 'مؤقتاً: يتحقق الموقع من كل أرقام DMC الأساسية (' + allowed.length + ' لوناً) إلى أن تُضاف قائمة ألوان المقاس 8.';
   }
 
   // ---------- أدوات ----------
@@ -63,16 +64,19 @@
       .map(function (x) { return x.c; });
   }
 
-  function perCarton() { return Math.max(1, parseInt(state.perCarton, 10) || window.BALLS_PER_CARTON || 10); }
-
+  function perCarton() { return window.BALLS_PER_CARTON || 10; }
   function toBalls(qty, unit) { return unit === 'carton' ? qty * perCarton() : qty; }
-
-  function formatQty(item) {
-    return item.qty + ' ' + (item.unit === 'carton' ? 'كرتونة' : 'كبة');
-  }
+  function unitName(unit) { return unit === 'carton' ? 'كرتونة' : 'كبة'; }
+  function formatQty(item) { return item.qty + ' ' + unitName(item.unit); }
 
   function totalBalls() {
     return state.items.reduce(function (s, it) { return s + toBalls(it.qty, it.unit); }, 0);
+  }
+
+  function cartonsText(balls) {
+    var cartons = Math.floor(balls / perCarton()), rest = balls % perCarton();
+    if (!cartons) return rest + ' كبة';
+    return cartons + ' كرتونة' + (rest ? ' و ' + rest + ' كبة' : '');
   }
 
   function el(tag, attrs, children) {
@@ -81,14 +85,20 @@
       if (k === 'class') e.className = attrs[k];
       else if (k === 'text') e.textContent = attrs[k];
       else if (k === 'style') e.setAttribute('style', attrs[k]);
+      else if (k.indexOf('aria-') === 0 || k === 'role' || k === 'dir') e.setAttribute(k, attrs[k]);
       else e[k] = attrs[k];
     });
-    (children || []).forEach(function (c) { if (c) e.appendChild(c); });
+    (children || []).forEach(function (c) { if (c) e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
     return e;
   }
 
   function swatch(code, extra) {
     return el('span', { class: 'swatch thread' + (extra ? ' ' + extra : ''), style: 'background-color:' + colorOf(code) });
+  }
+
+  function paintSwatch(node, code) {
+    node.className = code ? 'swatch thread' + (node.classList.contains('big') ? ' big' : '') : 'swatch empty';
+    node.style.backgroundColor = code ? colorOf(code) : '';
   }
 
   // ---------- التخزين ----------
@@ -97,15 +107,99 @@
     try {
       var s = JSON.parse(localStorage.getItem(STORAGE_KEY));
       if (s && Array.isArray(s.items)) {
-        s.items = s.items.filter(function (it) { return allowedSet.has(it.code); });
-        return s;
+        return { items: s.items.filter(function (it) { return allowedSet.has(it.code) && it.qty > 0; }) };
       }
-    } catch (e) { /* تخزين غير متاح */ }
-    return { items: [], perCarton: window.BALLS_PER_CARTON || 10 };
+    } catch (e) { /* التخزين غير متاح */ }
+    return { items: [] };
   }
 
   function save() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* تجاهل */ }
+  }
+
+  // ---------- أزرار الاختيار (كبة / كرتونة) والعدّاد ----------
+
+  function segValue(seg) {
+    var on = seg.querySelector('button.on');
+    return on ? on.getAttribute('data-value') : null;
+  }
+
+  function setSeg(seg, value) {
+    Array.prototype.forEach.call(seg.querySelectorAll('button'), function (b) {
+      var on = b.getAttribute('data-value') === value;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-checked', String(on));
+    });
+  }
+
+  function makeSeg(value, onChange) {
+    var seg = el('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'الوحدة' }, [
+      el('button', { type: 'button', role: 'radio', text: 'كبة' }),
+      el('button', { type: 'button', role: 'radio', text: 'كرتونة' })
+    ]);
+    seg.children[0].setAttribute('data-value', 'ball');
+    seg.children[1].setAttribute('data-value', 'carton');
+    setSeg(seg, value);
+    seg.addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b || b.classList.contains('on')) return;
+      setSeg(seg, b.getAttribute('data-value'));
+      onChange(b.getAttribute('data-value'));
+    });
+    return seg;
+  }
+
+  function bindSeg(seg, onChange) {
+    seg.addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b) return;
+      setSeg(seg, b.getAttribute('data-value'));
+      if (onChange) onChange(b.getAttribute('data-value'));
+    });
+  }
+
+  function makeStepper(value, onChange) {
+    var input = el('input', { type: 'number', min: 1, step: 1, value: value, inputMode: 'numeric', dir: 'ltr', 'aria-label': 'الكمية' });
+    var wrap = el('div', { class: 'stepper' }, [
+      el('button', { type: 'button', class: 'step', text: '−', 'aria-label': 'إنقاص' }),
+      input,
+      el('button', { type: 'button', class: 'step', text: '+', 'aria-label': 'زيادة' })
+    ]);
+    wrap.children[0].setAttribute('data-step', '-1');
+    wrap.children[2].setAttribute('data-step', '1');
+    input.addEventListener('change', function () {
+      var v = parseInt(input.value, 10);
+      if (v > 0) onChange(v); else input.value = value;
+    });
+    return wrap;
+  }
+
+  // أزرار + و − في كل الصفحة: تعدّل الحقل المجاور ثم تطلق حدث التغيير.
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('.step');
+    if (!b) return;
+    var input = b.parentNode.querySelector('input');
+    var v = Math.max(1, (parseInt(input.value, 10) || 1) + parseInt(b.getAttribute('data-step'), 10));
+    input.value = v;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
+  // ---------- رسالة قصيرة أسفل الشاشة ----------
+
+  var toastTimer = null;
+  function toast(text, actionText, action) {
+    var t = $('toast');
+    t.innerHTML = '';
+    t.appendChild(el('span', { text: text }));
+    if (actionText) {
+      var b = el('button', { type: 'button', text: actionText });
+      b.addEventListener('click', function () { t.hidden = true; action(); });
+      t.appendChild(b);
+    }
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.hidden = true; }, actionText ? 5000 : 2200);
   }
 
   // ---------- التحقق أثناء الكتابة ----------
@@ -113,17 +207,14 @@
   function rejectMessage(code, onPick) {
     var box = el('div', { class: 'msg err' });
     box.appendChild(el('div', {}, [
-      document.createTextNode('✗ الرقم '),
-      el('b', { class: 'ltr', text: code }),
-      document.createTextNode(' غير موجود في ألوان '),
-      el('span', { class: 'ltr', text: 'DMC Art. 116' }),
-      document.createTextNode('. لا يمكن إضافته.')
+      '✗ الرقم ', el('b', { class: 'ltr', text: code }), ' غير موجود في ألوان ',
+      el('span', { class: 'ltr', text: 'DMC Art. 116' }), '. لا يمكن إضافته.'
     ]));
     var sug = suggestions(code);
     if (sug.length) {
       var row = el('div', { class: 'suggest' }, [el('span', { text: 'هل تقصد:' })]);
       sug.forEach(function (c) {
-        var chip = el('button', { type: 'button', class: 'chip' }, [swatch(c), document.createTextNode(c)]);
+        var chip = el('button', { type: 'button', class: 'chip' }, [swatch(c), c]);
         chip.addEventListener('click', function () { onPick(c); });
         row.appendChild(chip);
       });
@@ -132,109 +223,121 @@
     return box;
   }
 
+  function quickLetters() {
+    var codes = LETTER_CODES.filter(function (c) { return allowedSet.has(c); });
+    if (!codes.length) return null;
+    var row = el('div', { class: 'quick' }, [el('span', { class: 'hint', text: 'ألوان بالحروف:' })]);
+    codes.forEach(function (c) {
+      var chip = el('button', { type: 'button', class: 'chip' }, [swatch(c), c]);
+      chip.addEventListener('click', function () { codeInput.value = c; checkCode(); });
+      row.appendChild(chip);
+    });
+    return row;
+  }
+
   function checkCode() {
-    var raw = codeInput.value.trim();
-    var code = normalizeCode(raw);
-    var wrap = codeInput.parentNode;
+    var code = normalizeCode(codeInput.value.trim());
+    var wrap = $('codeWrap');
     codeStatus.innerHTML = '';
     wrap.classList.remove('valid', 'invalid');
     if (!code) {
-      codeSwatch.className = 'swatch empty';
-      codeSwatch.style.background = '';
+      paintSwatch(codeSwatch, null);
       addBtn.disabled = true;
+      var q = quickLetters();
+      if (q) codeStatus.appendChild(q);
       return null;
     }
     if (allowedSet.has(code)) {
       wrap.classList.add('valid');
-      codeSwatch.className = 'swatch thread';
-      codeSwatch.style.background = '';
-      codeSwatch.style.backgroundColor = colorOf(code);
-      var existing = state.items.find(function (it) { return it.code === code; });
+      paintSwatch(codeSwatch, code);
+      var existing = findItem(code);
       codeStatus.appendChild(el('div', { class: 'msg ok' }, [
-        document.createTextNode('✓ الرقم '),
-        el('b', { class: 'ltr', text: code }),
-        document.createTextNode(existing ? ' موجود، وهو مضاف في الطلبية (' + formatQty(existing) + ') وستُجمع الكمية.' : ' موجود عند DMC.')
+        '✓ الرقم ', el('b', { class: 'ltr', text: code }),
+        existing ? ' موجود، وفي طلبيتك منه ' + formatQty(existing) + '. ستُجمع الكمية.' : ' موجود عند DMC.'
       ]));
       addBtn.disabled = !(parseInt(qtyInput.value, 10) > 0);
       return code;
     }
     wrap.classList.add('invalid');
-    codeSwatch.className = 'swatch empty';
-    codeSwatch.style.background = '';
+    paintSwatch(codeSwatch, null);
     addBtn.disabled = true;
-    codeStatus.appendChild(rejectMessage(code, function (c) {
-      codeInput.value = c;
-      checkCode();
-      qtyInput.focus();
-      qtyInput.select();
-    }));
+    codeStatus.appendChild(rejectMessage(code, function (c) { codeInput.value = c; checkCode(); }));
     return null;
   }
 
   // ---------- الطلبية ----------
 
-  function addItem(code, qty, unit) {
-    var existing = state.items.find(function (it) { return it.code === code; });
-    if (existing) {
-      if (existing.unit === unit) {
-        existing.qty += qty;
-      } else {
-        // وحدتان مختلفتان: نحوّل الكل إلى كبب ثم نعيدها إلى كراتين إن أمكن.
-        var balls = toBalls(existing.qty, existing.unit) + toBalls(qty, unit);
-        if (balls % perCarton() === 0) { existing.qty = balls / perCarton(); existing.unit = 'carton'; }
-        else { existing.qty = balls; existing.unit = 'ball'; }
-      }
-    } else {
-      state.items.push({ code: code, qty: qty, unit: unit });
-    }
+  function findItem(code) {
+    return state.items.find(function (it) { return it.code === code; });
   }
+
+  function addItem(code, qty, unit) {
+    var existing = findItem(code);
+    if (!existing) { state.items.push({ code: code, qty: qty, unit: unit }); return; }
+    if (existing.unit === unit) { existing.qty += qty; return; }
+    // وحدتان مختلفتان: نحوّل الكل إلى كبب ثم نعيدها إلى كراتين إن أمكن.
+    var balls = toBalls(existing.qty, existing.unit) + toBalls(qty, unit);
+    if (balls % perCarton() === 0) { existing.qty = balls / perCarton(); existing.unit = 'carton'; }
+    else { existing.qty = balls; existing.unit = 'ball'; }
+  }
+
+  var flashCode = null;
 
   function render() {
     var list = $('orderList');
     list.innerHTML = '';
     state.items.forEach(function (it, idx) {
-      var q = el('input', { type: 'number', min: 1, step: 1, value: it.qty, inputMode: 'numeric' });
-      q.setAttribute('dir', 'ltr');
-      q.addEventListener('change', function () {
-        var v = parseInt(q.value, 10);
-        if (v > 0) { it.qty = v; } else { q.value = it.qty; }
+      var del = el('button', { type: 'button', class: 'icon-btn', text: '×', 'aria-label': 'حذف ' + it.code });
+      del.addEventListener('click', function () {
+        var removed = state.items.splice(idx, 1)[0];
         commit();
+        checkCode();
+        toast('حُذف ' + removed.code, 'تراجع', function () {
+          state.items.splice(Math.min(idx, state.items.length), 0, removed);
+          commit();
+        });
       });
-      var u = el('select', {}, [
-        el('option', { value: 'ball', text: 'كبة' }),
-        el('option', { value: 'carton', text: 'كرتونة' })
-      ]);
-      u.value = it.unit;
-      u.addEventListener('change', function () { it.unit = u.value; commit(); });
-      var del = el('button', { type: 'button', class: 'del', title: 'حذف', text: '×' });
-      del.setAttribute('aria-label', 'حذف ' + it.code);
-      del.addEventListener('click', function () { state.items.splice(idx, 1); commit(); checkCode(); });
-      list.appendChild(el('li', {}, [
+      var li = el('li', {}, [
         swatch(it.code),
-        el('span', { class: 'num', text: it.code }),
-        el('span', { class: 'qty-edit' }, [q, u]),
-        el('span', { class: 'balls', text: it.unit === 'carton' ? '= ' + toBalls(it.qty, it.unit) + ' كبة' : '' }),
+        el('div', { class: 'code' }, [
+          el('b', { text: it.code }),
+          el('span', { text: it.unit === 'carton' ? '= ' + toBalls(it.qty, it.unit) + ' كبة' : '' })
+        ]),
+        makeStepper(it.qty, function (v) { it.qty = v; commit(); }),
+        makeSeg(it.unit, function (u) { it.unit = u; commit(); }),
         del
-      ]));
+      ]);
+      if (it.code === flashCode) li.classList.add('flash');
+      list.appendChild(li);
     });
+    flashCode = null;
 
-    var has = state.items.length > 0;
+    var n = state.items.length, has = n > 0, balls = totalBalls();
     $('orderEmpty').hidden = has;
     $('totals').hidden = !has;
-    $('imageBtn').disabled = !has;
-    $('clearBtn').disabled = !has;
+    $('clearBtn').hidden = !has;
+    $('orderBadge').hidden = !has;
+    $('orderBadge').textContent = n;
     if (has) {
-      var balls = totalBalls();
-      var cartons = Math.floor(balls / perCarton()), rest = balls % perCarton();
-      $('totals').innerHTML = '';
-      [['عدد الألوان', state.items.length],
-       ['مجموع الكبب', balls],
-       ['بالكراتين', cartons + ' كرتونة' + (rest ? ' + ' + rest + ' كبة' : '')]
-      ].forEach(function (p) {
-        $('totals').appendChild(el('span', {}, [document.createTextNode(p[0] + ': '), el('b', { text: String(p[1]) })]));
+      var dl = $('totals');
+      dl.innerHTML = '';
+      [['عدد الألوان', n], ['مجموع الكبب', balls], ['بالكراتين', cartonsText(balls)]].forEach(function (p) {
+        dl.appendChild(el('div', {}, [el('dt', { text: p[0] }), el('dd', { text: String(p[1]) })]));
       });
+      $('summaryText').innerHTML = '';
+      $('summaryText').appendChild(document.createTextNode(n + ' لون · ' + balls + ' كبة'));
+      $('summaryText').appendChild(el('small', { text: 'ما يعادل ' + cartonsText(balls) }));
+    } else {
+      $('imageCard').hidden = true;
     }
-    perCartonInput.value = perCarton();
+    updateBars();
+  }
+
+  function updateBars() {
+    var sheetOpen = !$('pickSheet').hidden;
+    $('summaryBar').hidden = !state.items.length || sheetOpen;
+    document.body.classList.toggle('has-bar', !$('summaryBar').hidden);
+    document.body.classList.toggle('sheet-open', sheetOpen);
   }
 
   function commit() {
@@ -253,39 +356,36 @@
       .trim();
     if (!s) return null;
     var parts = s.split(/\s+/);
-    var code = normalizeCode(parts.shift());
+    var first = parts.shift();
     var qty = 1, unit = 'ball';
     parts.forEach(function (p) {
       if (/^\d+$/.test(p)) qty = parseInt(p, 10);
       else if (/^(كرتون|كرتونة|كراتين|كرتونه|carton|box)/i.test(p)) unit = 'carton';
     });
-    return { code: code, qty: qty, unit: unit, raw: line.trim() };
+    return { code: normalizeCode(first), first: first, qty: qty, unit: unit };
   }
 
   function bulkAdd() {
     var status = $('bulkStatus');
     status.innerHTML = '';
-    var lines = $('bulkInput').value.split(/\n/);
-    var added = [], rejected = [], kept = [];
-    lines.forEach(function (line) {
+    var added = 0, rejected = [], kept = [];
+    $('bulkInput').value.split(/\n/).forEach(function (line) {
       var p = parseLine(line);
       if (!p) return;
-      if (allowedSet.has(p.code) && p.qty > 0) { addItem(p.code, p.qty, p.unit); added.push(p); }
+      if (allowedSet.has(p.code) && p.qty > 0) { addItem(p.code, p.qty, p.unit); added++; }
       else { rejected.push(p); kept.push(line); }
     });
-    if (added.length) {
-      status.appendChild(el('div', { class: 'msg ok', text: '✓ تمت إضافة ' + added.length + ' لون إلى الطلبية.' }));
-    }
+    if (added) status.appendChild(el('div', { class: 'msg ok', text: '✓ أُضيف ' + added + ' لون إلى الطلبية.' }));
     rejected.forEach(function (p, i) {
       status.appendChild(rejectMessage(p.code, function (c) {
-        kept[i] = kept[i].replace(new RegExp('^\\s*' + p.raw.split(/\s+/)[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), c);
+        kept[i] = kept[i].replace(p.first, c);
         $('bulkInput').value = kept.join('\n');
         bulkAdd();
       }));
     });
-    // نترك الأسطر المرفوضة فقط ليصححها المستخدم.
+    // تبقى الأسطر المرفوضة فقط ليصححها المستخدم.
     $('bulkInput').value = kept.join('\n');
-    if (added.length) commit();
+    if (added) commit();
   }
 
   // ---------- الصورة ----------
@@ -295,27 +395,46 @@
     var ctx = canvas.getContext('2d');
     var W = 1080, pad = 48, cols = 3, gap = 20;
     var cardW = (W - pad * 2 - gap * (cols - 1)) / cols, cardH = 230;
-    var rows = Math.ceil(state.items.length / cols);
-    var headH = 190, footH = 170;
+    var rows = Math.max(1, Math.ceil(state.items.length / cols));
+    var headH = 210, footH = 170;
     var H = headH + rows * cardH + (rows - 1) * gap + footH;
     canvas.width = W;
     canvas.height = H;
-    var font = function (w, s) { return w + ' ' + s + 'px Cairo, sans-serif'; };
+    var font = function (w, s, fam) { return w + ' ' + s + 'px ' + (fam || 'Cairo') + ', sans-serif'; };
 
-    ctx.fillStyle = '#f6f2ec';
+    ctx.fillStyle = '#f7f4ef';
     ctx.fillRect(0, 0, W, H);
 
-    ctx.fillStyle = '#b3263a';
-    ctx.fillRect(0, 0, W, 150);
+    // ملصق مثل علبة DMC: خلفية بيضاء وشريط أحمر ومربع المقاس.
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, W, 160);
+    ctx.fillStyle = '#e2483d';
+    ctx.fillRect(0, 160, W, 14);
+
+    ctx.textBaseline = 'alphabetic';
+    ctx.direction = 'ltr';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#1f1a17';
+    ctx.font = font(800, 64);
+    ctx.fillText('Art. 116', pad, 104);
+    var artW = ctx.measureText('Art. 116').width;
+    ctx.fillRect(pad + artW + 18, 50, 64, 64);
     ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'center';
+    ctx.font = font(800, 48);
+    ctx.fillText('8', pad + artW + 50, 100);
+
     ctx.direction = 'rtl';
-    ctx.font = font(800, 50);
-    ctx.fillText('طلبية خيوط DMC Art. 116 مقاس 8', W / 2, 78);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#1f1a17';
+    ctx.font = font(700, 46, 'Reem Kufi');
+    ctx.fillText('طلبية خيوط DMC', W - pad, 86);
+    ctx.fillStyle = '#756a63';
     ctx.font = font(600, 26);
     var date = new Date().toLocaleDateString('ar-EG-u-nu-latn', { year: 'numeric', month: 'long', day: 'numeric' });
-    ctx.fillText(date, W / 2, 122);
+    ctx.fillText(date, W - pad, 128);
 
+    ctx.textAlign = 'center';
     state.items.forEach(function (it, i) {
       var r = Math.floor(i / cols), c = i % cols;
       var x = W - pad - (c + 1) * cardW - c * gap; // ترتيب من اليمين لليسار
@@ -323,33 +442,34 @@
       roundRect(ctx, x, y, cardW, cardH, 18);
       ctx.fillStyle = '#ffffff';
       ctx.fill();
-      ctx.strokeStyle = '#e6ddd3';
+      ctx.strokeStyle = '#e7e0d7';
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      var cx = x + cardW / 2, cy = y + 72, rad = 50;
-      drawBall(ctx, cx, cy, rad, colorOf(it.code));
+      var cx = x + cardW / 2;
+      drawBall(ctx, cx, y + 72, 50, colorOf(it.code));
 
-      ctx.fillStyle = '#2b2320';
+      ctx.fillStyle = '#1f1a17';
       ctx.direction = 'ltr';
       ctx.font = font(800, 44);
       ctx.fillText(it.code, cx, y + 170);
       ctx.direction = 'rtl';
-      ctx.fillStyle = '#b3263a';
+      ctx.fillStyle = '#c62a2f';
       ctx.font = font(700, 28);
       ctx.fillText(formatQty(it), cx, y + 210);
     });
 
     var fy = headH + rows * cardH + (rows - 1) * gap + 40;
     roundRect(ctx, pad, fy, W - pad * 2, 100, 18);
-    ctx.fillStyle = '#2b2320';
+    ctx.fillStyle = '#1f1a17';
     ctx.fill();
     ctx.fillStyle = '#ffffff';
     ctx.font = font(700, 30);
-    var balls = totalBalls(), cartons = Math.floor(balls / perCarton()), rest = balls % perCarton();
+    var balls = totalBalls();
     ctx.fillText('عدد الألوان: ' + state.items.length + '   •   مجموع الكبب: ' + balls, W / 2, fy + 45);
     ctx.font = font(600, 24);
-    ctx.fillText('ما يعادل ' + cartons + ' كرتونة' + (rest ? ' و ' + rest + ' كبة' : '') + ' (الكرتونة = ' + perCarton() + ' كبب)', W / 2, fy + 82);
+    ctx.fillText('ما يعادل ' + cartonsText(balls) + ' (الكرتونة = ' + perCarton() + ' كبب)', W / 2, fy + 82);
+
     $('orderImage').src = canvas.toDataURL('image/png');
     prepareImageFile();
   }
@@ -364,7 +484,7 @@
     ctx.closePath();
   }
 
-  // رسم كبة خيط بسيطة: دائرة باللون مع خطوط لفّ وظل.
+  // رسم كبة خيط: دائرة باللون مع خطوط لفّ خفيفة وظل.
   function drawBall(ctx, cx, cy, r, color) {
     ctx.save();
     ctx.beginPath();
@@ -404,6 +524,78 @@
   }
 
   function fileName() { return 'DMC-116-' + new Date().toISOString().slice(0, 10) + '.png'; }
+
+  function openImage() {
+    showView('order');
+    var ready = document.fonts && document.fonts.load
+      ? Promise.all([
+          document.fonts.load('800 40px Cairo'),
+          document.fonts.load('600 20px Cairo'),
+          document.fonts.load('700 40px "Reem Kufi"')
+        ]).catch(function () {})
+      : Promise.resolve();
+    ready.then(function () {
+      $('imageCard').hidden = false;
+      $('shareNote').hidden = true;
+      drawImage();
+      $('imageCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
+  // ---------- التحميل والمشاركة ----------
+
+  var imageFile = null; // ملف الصورة جاهز مسبقاً حتى تعمل المشاركة مباشرة عند الضغط
+
+  function prepareImageFile() {
+    imageFile = null;
+    canvasBlob().then(function (blob) {
+      imageFile = new File([blob], fileName(), { type: 'image/png' });
+    });
+    $('waBtn').href = 'https://wa.me/?text=' + encodeURIComponent(orderText());
+  }
+
+  function orderText() {
+    var lines = ['طلبية خيوط DMC Art. 116 مقاس 8', ''];
+    state.items.forEach(function (it) { lines.push('• ' + it.code + ' — ' + formatQty(it)); });
+    lines.push('', 'عدد الألوان: ' + state.items.length);
+    lines.push('مجموع الكبب: ' + totalBalls() + ' (' + cartonsText(totalBalls()) + ')');
+    return lines.join('\n');
+  }
+
+  function shareNote(text, withLink) {
+    var note = $('shareNote');
+    note.innerHTML = '';
+    note.appendChild(document.createTextNode(text));
+    if (withLink) {
+      note.appendChild(document.createTextNode(' '));
+      note.appendChild(el('a', { href: $('waBtn').href, target: '_blank', rel: 'noopener', text: 'افتح واتساب مع نص الطلبية' }));
+    }
+    note.hidden = false;
+  }
+
+  // داخل صفحة Claude يمر التحميل عبر نافذة تأكيد، وخارجها رابط تحميل عادي.
+  function saveImage() {
+    return canvasBlob().then(function (blob) {
+      var use = window.claude && window.claude.use ? window.claude.use('downloads') : Promise.resolve(null);
+      return use.then(function (downloads) {
+        if (downloads) {
+          return downloads.save({ filename: fileName(), data: blob }).then(
+            function () { toast('تم حفظ الصورة'); },
+            function (err) {
+              if (err && err.code === 'declined') return;
+              shareNote('تعذّر حفظ الصورة هنا. اضغط مطولاً على الصورة لحفظها.');
+            });
+        }
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = fileName();
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+        toast('تم تحميل الصورة');
+      });
+    });
+  }
 
   // ---------- تصفح الألوان ----------
 
@@ -447,7 +639,7 @@
     return 'pink';
   }
 
-  var browse = { family: 'all', selected: null };
+  var browse = { family: 'all', sort: 'family', selected: null };
   var colorsView = $('colorsView');
 
   function codeSortKey(c) { return /^\d+$/.test(c) ? parseInt(c, 10) : -1; }
@@ -455,7 +647,6 @@
   function renderColors() {
     if (colorsView.hidden) return;
     var q = normalizeCode($('colorSearch').value);
-    var byNumber = $('colorSort').value === 'number';
     var inOrder = {};
     state.items.forEach(function (it) { inOrder[it.code] = it; });
 
@@ -468,12 +659,13 @@
     chips.innerHTML = '';
     [{ id: 'all', name: 'الكل' }].concat(FAMILIES).forEach(function (f) {
       var chip = el('button', { type: 'button', class: 'chip' + (browse.family === f.id ? ' active' : '') },
-        [f.dot ? el('span', { class: 'dot', style: 'background:' + f.dot }) : null, document.createTextNode(f.name)]);
+        [f.dot ? el('span', { class: 'dot', style: 'background:' + f.dot }) : null, f.name]);
+      chip.setAttribute('aria-pressed', String(browse.family === f.id));
       chip.addEventListener('click', function () { browse.family = f.id; renderColors(); });
       chips.appendChild(chip);
     });
 
-    var groups = byNumber
+    var groups = browse.sort === 'number'
       ? [{ name: '', codes: codes.slice().sort(function (a, b) { return codeSortKey(a) - codeSortKey(b) || a.localeCompare(b); }) }]
       : FAMILIES.map(function (f) {
           return {
@@ -486,23 +678,22 @@
     var box = $('colorGroups');
     box.innerHTML = '';
     if (!codes.length) {
-      box.appendChild(el('p', { class: 'empty-state', text: 'لا يوجد لون بهذا الرقم.' }));
+      box.appendChild(el('p', { class: 'empty-state hint', text: 'لا يوجد لون بهذا الرقم.' }));
       return;
     }
     groups.forEach(function (g) {
       var grid = el('div', { class: 'tile-grid' });
       g.codes.forEach(function (c) {
-        var tile = el('button', { type: 'button', class: 'tile' + (browse.selected === c ? ' selected' : '') }, [
+        var tile = el('button', { type: 'button', class: 'tile' + (browse.selected === c ? ' selected' : ''), 'aria-label': 'لون ' + c }, [
           swatch(c, 'big'),
           el('span', { class: 'num', text: c }),
           inOrder[c] ? el('span', { class: 'in-order', text: formatQty(inOrder[c]) }) : null
         ]);
-        tile.setAttribute('aria-label', 'لون ' + c);
         tile.addEventListener('click', function () { openPick(c); });
         grid.appendChild(tile);
       });
       box.appendChild(el('section', { class: 'group' }, [
-        g.name ? el('h3', {}, [document.createTextNode(g.name + ' '), el('small', { text: '(' + g.codes.length + ')' })]) : null,
+        g.name ? el('h3', {}, [g.name + ' ', el('small', { text: '(' + g.codes.length + ')' })]) : null,
         grid
       ]));
     });
@@ -510,20 +701,21 @@
 
   function openPick(code) {
     browse.selected = code;
-    $('pickSwatch').className = 'swatch thread big';
-    $('pickSwatch').style.backgroundColor = colorOf(code);
+    paintSwatch($('pickSwatch'), code);
     $('pickCode').textContent = code;
+    var have = findItem(code);
+    $('pickHave').textContent = have ? 'في طلبيتك: ' + formatQty(have) : 'غير مضاف بعد';
     $('pickQty').value = 1;
-    $('pickUnit').value = 'ball';
+    setSeg($('pickSeg'), 'ball');
     $('pickSheet').hidden = false;
-    document.body.classList.add('sheet-open');
+    updateBars();
     renderColors();
   }
 
   function closePick() {
     browse.selected = null;
     $('pickSheet').hidden = true;
-    document.body.classList.remove('sheet-open');
+    updateBars();
     renderColors();
   }
 
@@ -535,146 +727,89 @@
     $('tabColors').classList.toggle('active', colors);
     $('tabOrder').setAttribute('aria-selected', String(!colors));
     $('tabColors').setAttribute('aria-selected', String(colors));
-    if (colors) renderColors(); else closePick();
+    if (colors) renderColors(); else if (!$('pickSheet').hidden) closePick();
   }
-
-  $('tabOrder').addEventListener('click', function () { showView('order'); });
-  $('tabColors').addEventListener('click', function () { showView('colors'); });
-  $('colorSearch').addEventListener('input', renderColors);
-  $('colorSort').addEventListener('change', renderColors);
-  $('pickClose').addEventListener('click', closePick);
-  $('pickAdd').addEventListener('click', function () {
-    var qty = parseInt($('pickQty').value, 10);
-    if (!browse.selected || !(qty > 0)) return;
-    addItem(browse.selected, qty, $('pickUnit').value);
-    closePick();
-    commit();
-  });
 
   // ---------- الأحداث ----------
 
   codeInput.addEventListener('input', checkCode);
   qtyInput.addEventListener('input', checkCode);
+  bindSeg($('unitSeg'));
+  bindSeg($('pickSeg'));
+  bindSeg($('sortSeg'), function (v) { browse.sort = v; renderColors(); });
 
   $('addForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var code = checkCode();
     var qty = parseInt(qtyInput.value, 10);
     if (!code || !(qty > 0)) { codeInput.focus(); return; }
-    addItem(code, qty, unitInput.value);
+    var unit = segValue($('unitSeg'));
+    addItem(code, qty, unit);
+    flashCode = code;
     commit();
+    toast('أُضيف ' + code + ' · ' + qty + ' ' + unitName(unit));
     codeInput.value = '';
     qtyInput.value = 1;
+    setSeg($('unitSeg'), 'ball');
     checkCode();
     codeInput.focus();
   });
 
   $('bulkBtn').addEventListener('click', bulkAdd);
 
-  perCartonInput.addEventListener('change', function () {
-    var v = parseInt(perCartonInput.value, 10);
-    if (v > 0) state.perCarton = v;
-    commit();
-  });
-
   var clearArmed = null;
   $('clearBtn').addEventListener('click', function () {
     var btn = $('clearBtn');
     // تأكيد داخل الصفحة: الضغطة الأولى تطلب التأكيد والثانية تمسح.
     if (!clearArmed) {
-      btn.textContent = 'اضغط مرة أخرى للتأكيد';
-      clearArmed = setTimeout(function () { clearArmed = null; btn.textContent = 'مسح الطلبية'; }, 4000);
+      btn.textContent = 'اضغط مرة أخرى للمسح';
+      clearArmed = setTimeout(function () { clearArmed = null; btn.textContent = 'مسح الكل'; }, 4000);
       return;
     }
     clearTimeout(clearArmed);
     clearArmed = null;
-    btn.textContent = 'مسح الطلبية';
+    btn.textContent = 'مسح الكل';
+    var backup = state.items.slice();
     state.items = [];
-    $('imageCard').hidden = true;
     commit();
     checkCode();
+    toast('مُسحت الطلبية', 'تراجع', function () { state.items = backup; commit(); });
   });
 
-  $('imageBtn').addEventListener('click', function () {
-    var ready = document.fonts && document.fonts.load
-      ? Promise.all([document.fonts.load('800 40px Cairo'), document.fonts.load('600 20px Cairo')]).catch(function () {})
-      : Promise.resolve();
-    ready.then(function () {
-      $('imageCard').hidden = false;
-      drawImage();
-      $('imageCard').scrollIntoView({ behavior: 'smooth' });
-    });
-  });
-
-  // ---------- التحميل والمشاركة ----------
-
-  var imageFile = null; // ملف الصورة جاهز مسبقاً حتى تعمل المشاركة مباشرة عند الضغط
-
-  function prepareImageFile() {
-    imageFile = null;
-    canvasBlob().then(function (blob) {
-      imageFile = new File([blob], fileName(), { type: 'image/png' });
-    });
-    $('waBtn').href = 'https://wa.me/?text=' + encodeURIComponent(orderText());
-  }
-
-  function orderText() {
-    var balls = totalBalls(), cartons = Math.floor(balls / perCarton()), rest = balls % perCarton();
-    var lines = ['طلبية خيوط DMC Art. 116 مقاس 8', ''];
-    state.items.forEach(function (it) { lines.push('• ' + it.code + ' — ' + formatQty(it)); });
-    lines.push('', 'عدد الألوان: ' + state.items.length);
-    lines.push('مجموع الكبب: ' + balls + ' (' + cartons + ' كرتونة' + (rest ? ' و ' + rest + ' كبة' : '') + ')');
-    return lines.join('\n');
-  }
-
-  function shareNote(text, withLink) {
-    var note = $('shareNote');
-    note.innerHTML = '';
-    note.appendChild(document.createTextNode(text));
-    if (withLink) {
-      note.appendChild(document.createTextNode(' '));
-      note.appendChild(el('a', { href: $('waBtn').href, target: '_blank', rel: 'noopener', text: 'افتح واتساب مع نص الطلبية' }));
-    }
-    note.hidden = false;
-  }
-
-  // داخل صفحة Claude يمر التحميل عبر نافذة تأكيد، وخارجها رابط تحميل عادي.
-  function saveImage() {
-    return canvasBlob().then(function (blob) {
-      var use = window.claude && window.claude.use ? window.claude.use('downloads') : Promise.resolve(null);
-      return use.then(function (downloads) {
-        if (downloads) {
-          return downloads.save({ filename: fileName(), data: blob }).then(
-            function () { shareNote('تم حفظ الصورة.'); },
-            function (err) {
-              if (err && err.code === 'declined') return;
-              shareNote('تعذّر حفظ الصورة هنا. اضغط مطولاً على الصورة لحفظها.');
-            });
-        }
-        var a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = fileName();
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-      });
-    });
-  }
-
+  $('imageBtn').addEventListener('click', openImage);
   $('downloadBtn').addEventListener('click', saveImage);
 
   // زر واتساب: على الجوال تفتح قائمة المشاركة ومعها الصورة (اختر واتساب منها).
   // إذا لم يدعم المتصفح مشاركة الصور يفتح واتساب مباشرة مع نص الطلبية.
   $('waBtn').addEventListener('click', function (e) {
-    var data = imageFile && { files: [imageFile], text: orderText() };
-    if (!data || !navigator.canShare || !navigator.canShare({ files: [imageFile] })) return;
+    if (!imageFile || !navigator.canShare || !navigator.canShare({ files: [imageFile] })) return;
     e.preventDefault();
-    navigator.share(data).catch(function (err) {
+    navigator.share({ files: [imageFile], text: orderText() }).catch(function (err) {
       if (err && err.name === 'AbortError') return;
       shareNote('المتصفح هنا لا يسمح بإرسال الصورة مباشرة. حمّل الصورة أولاً ثم أرفقها في المحادثة، أو', true);
     });
   });
 
+  $('tabOrder').addEventListener('click', function () { showView('order'); });
+  $('tabColors').addEventListener('click', function () { showView('colors'); });
+  $('goColors').addEventListener('click', function () { showView('colors'); });
+  $('colorSearch').addEventListener('input', renderColors);
+  $('pickClose').addEventListener('click', closePick);
+  $('pickAdd').addEventListener('click', function () {
+    var qty = parseInt($('pickQty').value, 10);
+    var code = browse.selected;
+    if (!code || !(qty > 0)) return;
+    var unit = segValue($('pickSeg'));
+    addItem(code, qty, unit);
+    closePick();
+    commit();
+    toast('أُضيف ' + code + ' · ' + qty + ' ' + unitName(unit));
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !$('pickSheet').hidden) closePick();
+  });
+
   render();
+  checkCode();
   if (location.hash === '#colors') showView('colors');
 })();

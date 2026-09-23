@@ -2,136 +2,153 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f4ef">
   <title>خيوط DMC Art. 116</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Reem+Kufi:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <header class="top">
-    <div class="wrap">
-      <h1>طلبية خيوط <span class="ltr">DMC Art. 116</span> <span class="size-tag">مقاس 8</span></h1>
-      <p class="sub">أدخل أرقام الألوان والكميات. يرفض الموقع أي رقم غير موجود عند DMC، ثم يصنع لك صورة جاهزة للطلبية.</p>
+  <header class="masthead">
+    <div class="wrap masthead-inner">
+      <div class="label" aria-label="DMC Art. 116 مقاس 8">
+        <span class="label-art" dir="ltr">Art. 116</span>
+        <span class="label-box" dir="ltr">8</span>
+      </div>
+      <div>
+        <h1>طلبية خيوط DMC</h1>
+        <p class="sub">بيرلي كبب · الكرتونة 10 كبب</p>
+      </div>
     </div>
+    <nav class="wrap tabs" role="tablist">
+      <button id="tabOrder" type="button" role="tab" class="tab active" aria-selected="true">
+        الطلبية <span id="orderBadge" class="badge" hidden></span>
+      </button>
+      <button id="tabColors" type="button" role="tab" class="tab" aria-selected="false">تصفح الألوان</button>
+    </nav>
   </header>
-
-  <nav class="wrap tabs" role="tablist">
-    <button id="tabOrder" type="button" role="tab" class="tab active" aria-selected="true">الطلبية</button>
-    <button id="tabColors" type="button" role="tab" class="tab" aria-selected="false">تصفح الألوان</button>
-  </nav>
 
   <main class="wrap">
     <p id="listNotice" class="notice" hidden></p>
 
     <div id="orderView">
-
-    <section class="card">
-      <h2>إضافة لون</h2>
-      <form id="addForm" class="add-row" autocomplete="off" novalidate>
-        <label class="field code-field">
-          <span>رقم اللون</span>
-          <div class="code-input">
+      <section class="panel add-panel" aria-labelledby="addTitle">
+        <h2 id="addTitle">أضف لوناً</h2>
+        <form id="addForm" autocomplete="off" novalidate>
+          <div class="code-input" id="codeWrap">
             <span id="codeSwatch" class="swatch empty" aria-hidden="true"></span>
-            <input id="codeInput" type="text" inputmode="text" placeholder="مثال: 321" dir="ltr">
+            <input id="codeInput" type="text" inputmode="numeric" placeholder="رقم اللون" dir="ltr" aria-label="رقم اللون" enterkeyhint="done">
           </div>
-        </label>
-        <label class="field qty-field">
-          <span>الكمية</span>
-          <input id="qtyInput" type="number" min="1" step="1" value="1" inputmode="numeric" dir="ltr">
-        </label>
-        <label class="field unit-field">
-          <span>الوحدة</span>
-          <select id="unitInput">
-            <option value="ball">كبة</option>
-            <option value="carton">كرتونة</option>
-          </select>
-        </label>
-        <button id="addBtn" type="submit" class="btn primary" disabled>إضافة</button>
-      </form>
-      <div id="codeStatus" class="status" aria-live="polite"></div>
+          <div id="codeStatus" class="status" aria-live="polite"></div>
+          <div class="add-controls">
+            <div class="stepper">
+              <button type="button" class="step" data-step="-1" aria-label="إنقاص">−</button>
+              <input id="qtyInput" type="number" min="1" step="1" value="1" inputmode="numeric" dir="ltr" aria-label="الكمية">
+              <button type="button" class="step" data-step="1" aria-label="زيادة">+</button>
+            </div>
+            <div class="seg" role="radiogroup" aria-label="الوحدة" id="unitSeg">
+              <button type="button" role="radio" data-value="ball" aria-checked="true" class="on">كبة</button>
+              <button type="button" role="radio" data-value="carton" aria-checked="false">كرتونة</button>
+            </div>
+            <button id="addBtn" type="submit" class="btn primary" disabled>إضافة</button>
+          </div>
+        </form>
 
-      <details class="bulk">
-        <summary>لصق قائمة كاملة دفعة واحدة</summary>
-        <p class="hint">كل لون في سطر: الرقم ثم الكمية ثم الوحدة (اختيارية، والافتراضي كبة). مثال:</p>
-        <pre class="example" dir="rtl">310 5
-321 2 كرتونة
-BLANC 3 كبة</pre>
-        <textarea id="bulkInput" rows="6" dir="rtl" placeholder="310 5&#10;321 2 كرتونة"></textarea>
-        <button id="bulkBtn" type="button" class="btn">تحقق وأضف</button>
-        <div id="bulkStatus" class="status" aria-live="polite"></div>
-      </details>
-    </section>
+        <details class="bulk">
+          <summary>لصق قائمة كاملة دفعة واحدة</summary>
+          <p class="hint">كل لون في سطر: الرقم ثم الكمية، واكتب «كرتونة» إذا كانت الكمية بالكراتين.</p>
+          <textarea id="bulkInput" rows="5" dir="rtl" placeholder="310 5&#10;321 2 كرتونة&#10;BLANC 3"></textarea>
+          <button id="bulkBtn" type="button" class="btn">تحقق وأضف</button>
+          <div id="bulkStatus" class="status" aria-live="polite"></div>
+        </details>
+      </section>
 
-    <section class="card">
-      <div class="card-head">
-        <h2>الطلبية</h2>
-        <label class="per-carton">
-          عدد الكبب في الكرتونة
-          <input id="perCartonInput" type="number" min="1" step="1" dir="ltr">
-        </label>
-      </div>
-      <div id="orderEmpty" class="empty-state">لم تتم إضافة أي لون بعد.</div>
-      <ul id="orderList" class="order-list"></ul>
-      <div id="totals" class="totals" hidden></div>
-      <div class="actions">
-        <button id="imageBtn" type="button" class="btn primary" disabled>إنشاء صورة الطلبية</button>
-        <button id="clearBtn" type="button" class="btn ghost" disabled>مسح الطلبية</button>
-      </div>
-    </section>
+      <section class="panel" aria-labelledby="orderTitle">
+        <div class="panel-head">
+          <h2 id="orderTitle">الطلبية</h2>
+          <button id="clearBtn" type="button" class="link-btn danger" hidden>مسح الكل</button>
+        </div>
+        <div id="orderEmpty" class="empty-state">
+          <p>لم تُضف أي لون بعد.</p>
+          <p class="hint">اكتب رقم اللون في الأعلى، أو اختر من <button type="button" class="link-btn" id="goColors">تصفح الألوان</button>.</p>
+        </div>
+        <ul id="orderList" class="order-list"></ul>
+        <dl id="totals" class="totals" hidden></dl>
+      </section>
 
-    <section id="imageCard" class="card" hidden>
-      <h2>صورة الطلبية</h2>
-      <canvas id="orderCanvas" hidden></canvas>
-      <img id="orderImage" class="preview" alt="صورة الطلبية">
-      <div class="actions">
-        <button id="downloadBtn" type="button" class="btn primary">تحميل الصورة</button>
-        <a id="waBtn" class="btn wa" href="https://wa.me/" target="_blank" rel="noopener">
-          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2c0 1.3.9 2.5 1.1 2.7.1.2 1.8 2.8 4.4 3.9 1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.2-.2-.5-.3Z"/></svg>
-          إرسال على واتساب
-        </a>
-      </div>
-      <p id="shareNote" class="hint share-note" hidden></p>
-      <p class="hint">على الجوال يمكنك أيضاً الضغط مطولاً على الصورة لحفظها. الألوان على الشاشة تقريبية، والمرجع الدقيق هو رقم اللون.</p>
-    </section>
+      <section id="imageCard" class="panel" hidden aria-labelledby="imageTitle">
+        <h2 id="imageTitle">صورة الطلبية</h2>
+        <canvas id="orderCanvas" hidden></canvas>
+        <img id="orderImage" class="preview" alt="صورة الطلبية">
+        <div class="share-actions">
+          <a id="waBtn" class="btn wa" href="https://wa.me/" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2c0 1.3.9 2.5 1.1 2.7.1.2 1.8 2.8 4.4 3.9 1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.2-.2-.5-.3Z"/></svg>
+            إرسال على واتساب
+          </a>
+          <button id="downloadBtn" type="button" class="btn">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14"/></svg>
+            تحميل الصورة
+          </button>
+        </div>
+        <p id="shareNote" class="hint share-note" hidden></p>
+        <p class="hint">الألوان على الشاشة تقريبية، والمرجع الدقيق هو رقم اللون.</p>
+      </section>
     </div>
 
     <div id="colorsView" hidden>
-      <section class="card">
-        <div class="browse-tools">
-          <label class="field search-field">
-            <span>ابحث برقم اللون</span>
-            <input id="colorSearch" type="search" placeholder="مثال: 3865" dir="ltr" autocomplete="off">
-          </label>
-          <label class="field">
-            <span>الترتيب</span>
-            <select id="colorSort">
-              <option value="family">حسب مجموعة اللون</option>
-              <option value="number">حسب الرقم</option>
-            </select>
-          </label>
+      <section class="panel browse-panel">
+        <div class="search">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 16 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <input id="colorSearch" type="search" placeholder="ابحث برقم اللون" dir="rtl" autocomplete="off" inputmode="numeric" aria-label="ابحث برقم اللون">
         </div>
         <div id="familyChips" class="family-chips"></div>
-        <p id="colorCount" class="hint"></p>
+        <div class="browse-foot">
+          <p id="colorCount" class="hint"></p>
+          <div class="seg small" role="radiogroup" aria-label="الترتيب" id="sortSeg">
+            <button type="button" role="radio" data-value="family" aria-checked="true" class="on">حسب اللون</button>
+            <button type="button" role="radio" data-value="number" aria-checked="false">حسب الرقم</button>
+          </div>
+        </div>
       </section>
       <div id="colorGroups"></div>
     </div>
   </main>
 
-  <div id="pickSheet" class="pick-sheet" hidden>
-    <div class="wrap pick-inner">
-      <span id="pickSwatch" class="swatch big"></span>
-      <b id="pickCode" class="pick-code"></b>
-      <input id="pickQty" type="number" min="1" step="1" value="1" inputmode="numeric" dir="ltr" aria-label="الكمية">
-      <select id="pickUnit" aria-label="الوحدة">
-        <option value="ball">كبة</option>
-        <option value="carton">كرتونة</option>
-      </select>
-      <button id="pickAdd" type="button" class="btn primary">إضافة للطلبية</button>
-      <button id="pickClose" type="button" class="del" aria-label="إغلاق">×</button>
+  <div id="summaryBar" class="bottom-bar" hidden>
+    <div class="wrap bar-inner">
+      <p id="summaryText" class="bar-text"></p>
+      <button id="imageBtn" type="button" class="btn primary">الصورة والإرسال</button>
     </div>
   </div>
+
+  <div id="pickSheet" class="bottom-bar sheet" hidden role="dialog" aria-labelledby="pickCode">
+    <div class="wrap sheet-inner">
+      <div class="sheet-head">
+        <span id="pickSwatch" class="swatch thread big"></span>
+        <div class="sheet-title">
+          <b id="pickCode" class="pick-code" dir="ltr"></b>
+          <span id="pickHave" class="hint"></span>
+        </div>
+        <button id="pickClose" type="button" class="icon-btn" aria-label="إغلاق">×</button>
+      </div>
+      <div class="add-controls">
+        <div class="stepper">
+          <button type="button" class="step" data-step="-1" aria-label="إنقاص">−</button>
+          <input id="pickQty" type="number" min="1" step="1" value="1" inputmode="numeric" dir="ltr" aria-label="الكمية">
+          <button type="button" class="step" data-step="1" aria-label="زيادة">+</button>
+        </div>
+        <div class="seg" role="radiogroup" aria-label="الوحدة" id="pickSeg">
+          <button type="button" role="radio" data-value="ball" aria-checked="true" class="on">كبة</button>
+          <button type="button" role="radio" data-value="carton" aria-checked="false">كرتونة</button>
+        </div>
+        <button id="pickAdd" type="button" class="btn primary">إضافة</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
   <script src="js/dmc-colors.js"></script>
   <script src="js/art116.js"></script>
