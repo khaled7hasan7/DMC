@@ -387,3 +387,5 @@ body.sheet-open .toast { bottom: calc(190px + env(safe-area-inset-bottom, 0px));
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+.title-field { display: grid; gap: 4px; margin: 10px 0 6px; }

@@ -19,7 +19,7 @@
       </div>
       <div>
         <h1>طلبية خيوط DMC</h1>
-        <p class="sub">بيرلي كبب · الكرتونة 10 كبب</p>
+        <p class="sub">بيرلي طبب · الكرتونة 10 طبب</p>
       </div>
     </div>
     <nav class="wrap tabs" role="tablist">
@@ -49,7 +49,7 @@
               <button type="button" class="step" data-step="1" aria-label="زيادة">+</button>
             </div>
             <div class="seg" role="radiogroup" aria-label="الوحدة" id="unitSeg">
-              <button type="button" role="radio" data-value="ball" aria-checked="true" class="on">كبة</button>
+              <button type="button" role="radio" data-value="ball" aria-checked="true" class="on">طبة</button>
               <button type="button" role="radio" data-value="carton" aria-checked="false">كرتونة</button>
             </div>
             <button id="addBtn" type="submit" class="btn primary" disabled>إضافة</button>
@@ -70,6 +70,10 @@
           <h2 id="orderTitle">الطلبية</h2>
           <button id="clearBtn" type="button" class="link-btn danger" hidden>مسح الكل</button>
         </div>
+        <label class="title-field">
+          <span class="hint">عنوان الطلبية</span>
+          <input id="titleInput" type="text" maxlength="60" placeholder="مثال: طلبية محل النور، أو اسم الزبون" autocomplete="off">
+        </label>
         <div id="orderEmpty" class="empty-state">
           <p>لم تُضف أي لون بعد.</p>
           <p class="hint">اكتب رقم اللون في الأعلى، أو اختر من <button type="button" class="link-btn" id="goColors">تصفح الألوان</button>.</p>
@@ -140,7 +144,7 @@
           <button type="button" class="step" data-step="1" aria-label="زيادة">+</button>
         </div>
         <div class="seg" role="radiogroup" aria-label="الوحدة" id="pickSeg">
-          <button type="button" role="radio" data-value="ball" aria-checked="true" class="on">كبة</button>
+          <button type="button" role="radio" data-value="ball" aria-checked="true" class="on">طبة</button>
           <button type="button" role="radio" data-value="carton" aria-checked="false">كرتونة</button>
         </div>
         <button id="pickAdd" type="button" class="btn primary">إضافة</button>

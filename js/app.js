@@ -6,10 +6,13 @@
   var LETTER_CODES = ['BLANC', 'ECRU', 'B5200'];
 
   // الأرقام المقبولة: قائمة Art. 116 إن وُجدت، وإلا أرقام DMC الأساسية.
+  var EXTRA = window.EXTRA_COLORS || {};
+  Object.keys(EXTRA).forEach(function (c) { window.DMC_COLORS[c] = EXTRA[c]; });
   var hasArt116List = !!(window.ART116_CODES && window.ART116_CODES.length);
   var allowed = hasArt116List
     ? window.ART116_CODES.map(function (c) { return normalizeCode(c); })
     : Object.keys(window.DMC_COLORS);
+  Object.keys(EXTRA).forEach(function (c) { if (allowed.indexOf(c) < 0) allowed.push(c); });
   var allowedSet = new Set(allowed);
 
   var state = load();
@@ -66,7 +69,7 @@
 
   function perCarton() { return window.BALLS_PER_CARTON || 10; }
   function toBalls(qty, unit) { return unit === 'carton' ? qty * perCarton() : qty; }
-  function unitName(unit) { return unit === 'carton' ? 'كرتونة' : 'كبة'; }
+  function unitName(unit) { return unit === 'carton' ? 'كرتونة' : 'طبة'; }
   function formatQty(item) { return item.qty + ' ' + unitName(item.unit); }
 
   function totalBalls() {
@@ -75,8 +78,8 @@
 
   function cartonsText(balls) {
     var cartons = Math.floor(balls / perCarton()), rest = balls % perCarton();
-    if (!cartons) return rest + ' كبة';
-    return cartons + ' كرتونة' + (rest ? ' و ' + rest + ' كبة' : '');
+    if (!cartons) return rest + ' طبة';
+    return cartons + ' كرتونة' + (rest ? ' و ' + rest + ' طبة' : '');
   }
 
   function el(tag, attrs, children) {
@@ -107,17 +110,17 @@
     try {
       var s = JSON.parse(localStorage.getItem(STORAGE_KEY));
       if (s && Array.isArray(s.items)) {
-        return { items: s.items.filter(function (it) { return allowedSet.has(it.code) && it.qty > 0; }) };
+        return { title: typeof s.title === 'string' ? s.title : '', items: s.items.filter(function (it) { return allowedSet.has(it.code) && it.qty > 0; }) };
       }
     } catch (e) { /* التخزين غير متاح */ }
-    return { items: [] };
+    return { title: '', items: [] };
   }
 
   function save() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* تجاهل */ }
   }
 
-  // ---------- أزرار الاختيار (كبة / كرتونة) والعدّاد ----------
+  // ---------- أزرار الاختيار (طبة / كرتونة) والعدّاد ----------
 
   function segValue(seg) {
     var on = seg.querySelector('button.on');
@@ -134,7 +137,7 @@
 
   function makeSeg(value, onChange) {
     var seg = el('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'الوحدة' }, [
-      el('button', { type: 'button', role: 'radio', text: 'كبة' }),
+      el('button', { type: 'button', role: 'radio', text: 'طبة' }),
       el('button', { type: 'button', role: 'radio', text: 'كرتونة' })
     ]);
     seg.children[0].setAttribute('data-value', 'ball');
@@ -275,7 +278,7 @@
     var existing = findItem(code);
     if (!existing) { state.items.push({ code: code, qty: qty, unit: unit }); return; }
     if (existing.unit === unit) { existing.qty += qty; return; }
-    // وحدتان مختلفتان: نحوّل الكل إلى كبب ثم نعيدها إلى كراتين إن أمكن.
+    // وحدتان مختلفتان: نحوّل الكل إلى طبب ثم نعيدها إلى كراتين إن أمكن.
     var balls = toBalls(existing.qty, existing.unit) + toBalls(qty, unit);
     if (balls % perCarton() === 0) { existing.qty = balls / perCarton(); existing.unit = 'carton'; }
     else { existing.qty = balls; existing.unit = 'ball'; }
@@ -301,7 +304,7 @@
         swatch(it.code),
         el('div', { class: 'code' }, [
           el('b', { text: it.code }),
-          el('span', { text: it.unit === 'carton' ? '= ' + toBalls(it.qty, it.unit) + ' كبة' : '' })
+          el('span', { text: it.unit === 'carton' ? '= ' + toBalls(it.qty, it.unit) + ' طبة' : '' })
         ]),
         makeStepper(it.qty, function (v) { it.qty = v; commit(); }),
         makeSeg(it.unit, function (u) { it.unit = u; commit(); }),
@@ -321,11 +324,11 @@
     if (has) {
       var dl = $('totals');
       dl.innerHTML = '';
-      [['عدد الألوان', n], ['مجموع الكبب', balls], ['بالكراتين', cartonsText(balls)]].forEach(function (p) {
+      [['عدد الألوان', n], ['مجموع الطبب', balls], ['بالكراتين', cartonsText(balls)]].forEach(function (p) {
         dl.appendChild(el('div', {}, [el('dt', { text: p[0] }), el('dd', { text: String(p[1]) })]));
       });
       $('summaryText').innerHTML = '';
-      $('summaryText').appendChild(document.createTextNode(n + ' لون · ' + balls + ' كبة'));
+      $('summaryText').appendChild(document.createTextNode(n + ' لون · ' + balls + ' طبة'));
       $('summaryText').appendChild(el('small', { text: 'ما يعادل ' + cartonsText(balls) }));
     } else {
       $('imageCard').hidden = true;
@@ -427,8 +430,10 @@
     ctx.direction = 'rtl';
     ctx.textAlign = 'right';
     ctx.fillStyle = '#1f1a17';
-    ctx.font = font(700, 46, 'Reem Kufi');
-    ctx.fillText('طلبية خيوط DMC', W - pad, 86);
+    // العنوان: عنوان الطلبية إن وُجد، ويصغر الخط حتى يتسع بجانب الملصق.
+    var title = orderTitle(), maxW = W - pad * 2 - artW - 120, size = 46;
+    do { ctx.font = font(700, size, 'Reem Kufi'); size -= 2; } while (ctx.measureText(title).width > maxW && size > 22);
+    ctx.fillText(title, W - pad, 86, maxW);
     ctx.fillStyle = '#756a63';
     ctx.font = font(600, 26);
     var date = new Date().toLocaleDateString('ar-EG-u-nu-latn', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -466,9 +471,9 @@
     ctx.fillStyle = '#ffffff';
     ctx.font = font(700, 30);
     var balls = totalBalls();
-    ctx.fillText('عدد الألوان: ' + state.items.length + '   •   مجموع الكبب: ' + balls, W / 2, fy + 45);
+    ctx.fillText('عدد الألوان: ' + state.items.length + '   •   مجموع الطبب: ' + balls, W / 2, fy + 45);
     ctx.font = font(600, 24);
-    ctx.fillText('ما يعادل ' + cartonsText(balls) + ' (الكرتونة = ' + perCarton() + ' كبب)', W / 2, fy + 82);
+    ctx.fillText('ما يعادل ' + cartonsText(balls) + ' (الكرتونة = ' + perCarton() + ' طبب)', W / 2, fy + 82);
 
     $('orderImage').src = canvas.toDataURL('image/png');
     prepareImageFile();
@@ -484,7 +489,7 @@
     ctx.closePath();
   }
 
-  // رسم كبة خيط: دائرة باللون مع خطوط لفّ خفيفة وظل.
+  // رسم طبة خيط: دائرة باللون مع خطوط لفّ خفيفة وظل.
   function drawBall(ctx, cx, cy, r, color) {
     ctx.save();
     ctx.beginPath();
@@ -518,6 +523,8 @@
     var n = parseInt(hex.slice(1), 16);
     return ((n >> 16) * 299 + ((n >> 8) & 255) * 587 + (n & 255) * 114) / 1000 < 90;
   }
+
+  function orderTitle() { return state.title || 'طلبية خيوط DMC'; }
 
   function canvasBlob() {
     return new Promise(function (res) { $('orderCanvas').toBlob(res, 'image/png'); });
@@ -555,10 +562,10 @@
   }
 
   function orderText() {
-    var lines = ['طلبية خيوط DMC Art. 116 مقاس 8', ''];
+    var lines = [state.title ? state.title + ' — طلبية خيوط DMC Art. 116 مقاس 8' : 'طلبية خيوط DMC Art. 116 مقاس 8', ''];
     state.items.forEach(function (it) { lines.push('• ' + it.code + ' — ' + formatQty(it)); });
     lines.push('', 'عدد الألوان: ' + state.items.length);
-    lines.push('مجموع الكبب: ' + totalBalls() + ' (' + cartonsText(totalBalls()) + ')');
+    lines.push('مجموع الطبب: ' + totalBalls() + ' (' + cartonsText(totalBalls()) + ')');
     return lines.join('\n');
   }
 
@@ -757,6 +764,13 @@
 
   $('bulkBtn').addEventListener('click', bulkAdd);
 
+  $('titleInput').value = state.title;
+  $('titleInput').addEventListener('input', function () {
+    state.title = $('titleInput').value.trim();
+    save();
+    if (!$('imageCard').hidden) drawImage();
+  });
+
   var clearArmed = null;
   $('clearBtn').addEventListener('click', function () {
     var btn = $('clearBtn');
@@ -769,11 +783,18 @@
     clearTimeout(clearArmed);
     clearArmed = null;
     btn.textContent = 'مسح الكل';
-    var backup = state.items.slice();
+    var backup = state.items.slice(), backupTitle = state.title;
     state.items = [];
+    state.title = '';
+    $('titleInput').value = '';
     commit();
     checkCode();
-    toast('مُسحت الطلبية', 'تراجع', function () { state.items = backup; commit(); });
+    toast('مُسحت الطلبية', 'تراجع', function () {
+      state.items = backup;
+      state.title = backupTitle;
+      $('titleInput').value = backupTitle;
+      commit();
+    });
   });
 
   $('imageBtn').addEventListener('click', openImage);
